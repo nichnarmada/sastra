@@ -5,9 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from "react-native"
 import { useSignUp } from "@clerk/clerk-expo"
-import { TextInput } from "react-native"
 import { Link, useRouter } from "expo-router"
 import { useOAuth } from "@clerk/clerk-expo"
 import * as WebBrowser from "expo-web-browser"
@@ -15,150 +15,143 @@ import * as WebBrowser from "expo-web-browser"
 WebBrowser.maybeCompleteAuthSession()
 
 export default function Register() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [pendingVerification, setPendingVerification] = useState(false)
-  const [code, setCode] = useState("")
-  const { signUp, setActive } = useSignUp()
-  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" })
-  const [loading, setLoading] = useState(false)
+  const { signUp, setActive, isLoaded } = useSignUp()
   const router = useRouter()
+  const [username, setUsername] = useState("")
+  const [emailAddress, setEmailAddress] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  const handleSignUp = async () => {
-    if (!signUp) return
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" })
+
+  const onSignUpPress = async () => {
+    if (!isLoaded) return
+    if (!username || !emailAddress || !password) {
+      setError("All fields are required")
+      return
+    }
 
     try {
       setLoading(true)
-      // Start the sign-up process
+      setError("")
+
+      // Create the user with username
       await signUp.create({
-        emailAddress: email,
+        emailAddress,
         password,
+        username,
       })
 
-      // Send email verification code
+      // Prepare email verification
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
 
-      // Change the UI to show the verification form
-      setPendingVerification(true)
-    } catch (err) {
-      console.error("Error signing up:", err)
+      // Navigate to verification
+      router.replace("/(auth)/verify")
+    } catch (err: any) {
+      console.log("Registration error:", err)
+      setError(err.errors?.[0]?.message || "Failed to sign up")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVerifyCode = async () => {
-    if (!signUp || !code) return
-
+  const onGooglePress = async () => {
     try {
-      setLoading(true)
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      })
+      const { createdSessionId, setActive } = (await startOAuthFlow()) || {}
 
-      await setActive?.({ session: completeSignUp.createdSessionId })
-    } catch (err) {
-      console.error("Error verifying email:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGoogleSignUp = async () => {
-    try {
-      const { createdSessionId, setActive } = await startOAuthFlow()
-
-      if (createdSessionId) {
-        setActive?.({ session: createdSessionId })
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId })
+        router.replace("/(app)")
       }
-    } catch (err) {
-      console.error("OAuth error:", err)
+    } catch (err: any) {
+      setError("Failed to sign up with Google")
     }
   }
 
-  if (pendingVerification) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Verify Your Email</Text>
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Sign Up</Text>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <View style={styles.form}>
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Verification Code</Text>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Username</Text>
+            <Text style={styles.required}>*</Text>
+          </View>
           <TextInput
+            autoCapitalize="none"
+            value={username}
+            placeholder="Choose a username"
+            placeholderTextColor="#888"
+            onChangeText={setUsername}
             style={styles.input}
-            placeholder="Enter verification code"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Email</Text>
+            <Text style={styles.required}>*</Text>
+          </View>
+          <TextInput
+            autoCapitalize="none"
+            value={emailAddress}
+            placeholder="Enter your email"
+            placeholderTextColor="#888"
+            onChangeText={setEmailAddress}
+            style={styles.input}
+            keyboardType="email-address"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Password</Text>
+            <Text style={styles.required}>*</Text>
+          </View>
+          <TextInput
+            value={password}
+            placeholder="Enter your password"
+            placeholderTextColor="#888"
+            secureTextEntry={true}
+            onChangeText={setPassword}
+            style={styles.input}
           />
         </View>
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleVerifyCode}
+          onPress={onSignUpPress}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Verify Email</Text>
+            <Text style={styles.buttonText}>Sign Up</Text>
           )}
         </TouchableOpacity>
-      </View>
-    )
-  }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your email"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-      </View>
+        <TouchableOpacity style={styles.googleButton} onPress={onGooglePress}>
+          <Text style={styles.googleButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleSignUp}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Sign Up</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.button, styles.googleButton]}
-        onPress={handleGoogleSignUp}
-      >
-        <Text style={styles.buttonText}>Sign up with Google</Text>
-      </TouchableOpacity>
-
-      <View style={styles.loginContainer}>
-        <Text style={styles.loginText}>Already have an account? </Text>
-        <Link href="/(auth)/login" asChild>
-          <TouchableOpacity>
-            <Text style={styles.loginLink}>Sign In</Text>
-          </TouchableOpacity>
-        </Link>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account?</Text>
+          <Link href="/(auth)/login" asChild>
+            <TouchableOpacity>
+              <Text style={styles.footerLink}>Sign in</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
       </View>
     </View>
   )
@@ -167,36 +160,40 @@ export default function Register() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    justifyContent: "center",
+    padding: 20,
     backgroundColor: "#fff",
+    justifyContent: "center",
   },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 32,
+    marginBottom: 30,
     textAlign: "center",
   },
+  form: {
+    gap: 20,
+  },
   inputContainer: {
-    marginBottom: 16,
+    gap: 8,
   },
   label: {
     fontSize: 16,
-    marginBottom: 8,
     fontWeight: "500",
+    color: "#333",
   },
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
     padding: 12,
     borderRadius: 8,
+    fontSize: 16,
   },
   button: {
     backgroundColor: "#4A90E2",
     padding: 16,
     borderRadius: 8,
     alignItems: "center",
-    marginTop: 16,
+    marginTop: 10,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -206,22 +203,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  googleButton: {
-    backgroundColor: "#DB4437",
-    marginTop: 12,
+  errorText: {
+    color: "#FF3B30",
+    textAlign: "center",
+    marginBottom: 20,
+    fontSize: 14,
   },
-  loginContainer: {
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#ddd",
+  },
+  dividerText: {
+    color: "#666",
+    paddingHorizontal: 10,
+  },
+  googleButton: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  googleButtonText: {
+    color: "#333",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  footer: {
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: 24,
+    alignItems: "center",
+    marginTop: 20,
+    gap: 8,
   },
-  loginText: {
-    fontSize: 14,
+  footerText: {
     color: "#666",
   },
-  loginLink: {
-    fontSize: 14,
+  footerLink: {
     color: "#4A90E2",
     fontWeight: "500",
+  },
+  labelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  required: {
+    color: "#FF3B30",
+    marginLeft: 4,
+    fontSize: 16,
   },
 })

@@ -1,16 +1,14 @@
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { useRouter } from "expo-router"
-import { useAuth } from "@clerk/clerk-expo"
+import { useUser } from "@clerk/clerk-expo"
 
 export default function Home() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user } = useUser()
 
   return (
     <View style={styles.container}>
-      <Text style={styles.welcome}>
-        Welcome, {user?.emailAddresses[0].emailAddress}
-      </Text>
+      <Text style={styles.welcome}>Welcome, {user?.firstName || "User"}!</Text>
 
       <View style={styles.statsContainer}>
         <View style={styles.statBox}>

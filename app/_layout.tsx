@@ -1,29 +1,39 @@
 import { Slot, Stack, useRouter, useSegments } from "expo-router"
-import { ClerkProvider, useAuth } from "@clerk/clerk-expo"
+import { ClerkProvider, useAuth, useUser } from "@clerk/clerk-expo"
 import { tokenCache } from "@/lib/cache"
-import Constants from "expo-constants"
 import { View, ActivityIndicator } from "react-native"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 function InitialLayout() {
-  const { isLoaded, isSignedIn } = useAuth()
+  const { isLoaded: authLoaded, isSignedIn } = useAuth()
+  const { isLoaded: userLoaded, user } = useUser()
   const segments = useSegments()
   const router = useRouter()
+  const [initialNavigationComplete, setInitialNavigationComplete] =
+    useState(false)
 
   useEffect(() => {
-    if (!isLoaded) return
+    if (!authLoaded || !userLoaded || initialNavigationComplete) return
 
-    const inTabsGroup = segments[0] === "(app)"
-    const inAuthGroup = segments[0] === "(auth)"
-
-    if (isSignedIn && !inTabsGroup) {
-      router.replace("/(app)")
-    } else if (!isSignedIn && !inAuthGroup) {
-      router.replace("/(auth)/login")
+    const navigate = async () => {
+      if (!isSignedIn) {
+        router.replace("/(auth)/login")
+      } else {
+        const isProfileIncomplete =
+          !user?.firstName || !user?.lastName || !user?.username
+        if (isProfileIncomplete) {
+          router.replace("/(auth)/complete-profile")
+        } else {
+          router.replace("/(app)")
+        }
+      }
+      setInitialNavigationComplete(true)
     }
-  }, [isSignedIn, segments, isLoaded])
 
-  if (!isLoaded) {
+    navigate()
+  }, [authLoaded, userLoaded, isSignedIn])
+
+  if (!authLoaded || !userLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#4A90E2" />

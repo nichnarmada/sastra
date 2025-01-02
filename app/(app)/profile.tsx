@@ -20,8 +20,11 @@ export default function Profile() {
 
   const handleSignOut = async () => {
     try {
+      setShowLogoutModal(false)
+      // First sign out which clears the session
       await signOut()
-      router.replace("/(auth)/login")
+      // Then clear any remaining state and redirect
+      await router.push("/(auth)/login")
     } catch (error) {
       Alert.alert("Error", "Failed to sign out")
     }
@@ -37,10 +40,10 @@ export default function Profile() {
             <MaterialIcons name="person" size={40} color="#666" />
           </View>
         )}
-        <Text style={styles.name}>{user?.firstName || "User"}</Text>
-        <Text style={styles.email}>
-          {user?.primaryEmailAddress?.emailAddress}
+        <Text style={styles.name}>
+          {user?.firstName} {user?.lastName}
         </Text>
+        <Text style={styles.username}>@{user?.username}</Text>
       </View>
 
       <View style={styles.section}>
@@ -141,7 +144,7 @@ const styles = StyleSheet.create({
     color: "#000",
     marginBottom: 4,
   },
-  email: {
+  username: {
     fontSize: 14,
     color: "#666",
   },

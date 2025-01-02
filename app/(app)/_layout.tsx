@@ -1,14 +1,7 @@
-import { Tabs, Redirect } from "expo-router"
+import { Tabs } from "expo-router"
 import { MaterialIcons } from "@expo/vector-icons"
-import { useAuth } from "@clerk/clerk-expo"
 
 export default function AppLayout() {
-  const { isSignedIn, isLoaded } = useAuth()
-
-  if (isLoaded && !isSignedIn) {
-    return <Redirect href="/(auth)/login" />
-  }
-
   return (
     <Tabs
       screenOptions={{
